@@ -8,7 +8,6 @@ public class ManagerolesApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(ManagerolesApplication.class, args);
-		System.out.println("Role Running...");
 	}
 
 }
