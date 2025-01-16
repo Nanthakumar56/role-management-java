@@ -1,7 +1,6 @@
 package com.springboot.manageroles.controller;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,14 +8,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.springboot.manageroles.dto.RolePayload;
+import com.springboot.manageroles.dto.RoleDTO;
 import com.springboot.manageroles.service.RoleService;
 
 @Controller
@@ -27,7 +25,7 @@ public class RoleController {
 	private RoleService roleService;
 	
 	@PostMapping("/newRole")
-    public ResponseEntity<?> createRole(@RequestBody RolePayload role) {
+    public ResponseEntity<?> createRole(@RequestBody RoleDTO role) {
         String rolePayload = roleService.createRole(role);
 
         if (rolePayload != null) {
@@ -38,8 +36,8 @@ public class RoleController {
     }
 
 	@GetMapping("/getallroles")
-	public ResponseEntity<List<RolePayload>> getAllRoles() {
-        List<RolePayload> rolePayloadList = roleService.getAllRolePayloads();
+	public ResponseEntity<List<RoleDTO>> getAllRoles() {
+        List<RoleDTO> rolePayloadList = roleService.getAllRoles();
 
         if (!rolePayloadList.isEmpty()) {
             return ResponseEntity.status(HttpStatus.OK).body(rolePayloadList);
@@ -48,31 +46,44 @@ public class RoleController {
         }
     }
 
-    @GetMapping("/getRole")
-    public ResponseEntity<RolePayload> getRole(@RequestParam String roleId) {
-        Optional<RolePayload> rolePayload = roleService.getRolePayloadById(roleId);
+	@GetMapping("/getRole")
+	public ResponseEntity<?> getRole(@RequestParam String roleId) {
+	    try {
+	        RoleDTO rolePayload = roleService.getRoleById(roleId);
 
-        return rolePayload.map(payload ->
-                ResponseEntity.status(HttpStatus.OK).body(payload))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT).build());
-    }
+	        if (rolePayload == null) {
+	            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+	        }
+
+	        return ResponseEntity.status(HttpStatus.OK).body(rolePayload);
+	    } catch (RuntimeException e) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Role not found.");
+	    } catch (Exception e) {
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while fetching the role.");
+	    }
+	}
+
     
     @PutMapping("/update")
-    public ResponseEntity<RolePayload> updateRoleWithPermissions(
-        @RequestBody RolePayload rolePayload
+    public ResponseEntity<?> updateRoleWithPermissions(
+        @RequestBody RoleDTO rolePayload
     ) {
-        Optional<RolePayload> updatedRolePayload = roleService.updateRoleWithPermissions(rolePayload.getRoleid(), rolePayload);
+        String updatedRolePayload = roleService.updateRole(rolePayload.getRoleId(), rolePayload);
 
-        return updatedRolePayload.map(payload -> 
-            ResponseEntity.status(HttpStatus.OK).body(payload)
-        ).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+        if(updatedRolePayload != null)
+        {
+        	return  ResponseEntity.status(HttpStatus.OK).body(updatedRolePayload);
+        }
+        else {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role updation failure");
+        }
     }
     	
     @DeleteMapping("/deleteRole")
     public ResponseEntity<String> deleteRole(@RequestParam String roleId) {
-        boolean status = roleService.deleteRole(roleId);
-        if (status) {
-            return ResponseEntity.status(HttpStatus.OK).body("Role and associated permissions deleted successfully");
+        String status = roleService.deleteRole(roleId);
+        if (status != null) {
+            return ResponseEntity.status(HttpStatus.OK).body(status);
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to delete role or role is not inactive");
         }

@@ -1,12 +1,7 @@
 package com.springboot.manageroles.service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,210 +9,276 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.springboot.manageroles.dto.RolePayload;
+import com.springboot.manageroles.dto.AdvCriteriaDTO;
+import com.springboot.manageroles.dto.PermissionDTO;
+import com.springboot.manageroles.dto.RoleDTO;
+import com.springboot.manageroles.entity.AdvCriteria;
 import com.springboot.manageroles.entity.Permissions;
 import com.springboot.manageroles.entity.Roles;
+import com.springboot.manageroles.repository.AdvCriteriaRepository;
 import com.springboot.manageroles.repository.PermissionsRepository;
 import com.springboot.manageroles.repository.RoleRepository;
 
 @Service
-public class RoleService 
-{
-	@Autowired
-	private RoleRepository roleRepository;
-	
-	@Autowired
-	private PermissionsRepository permissionRepository;
-	
-	public String createRole(RolePayload rolePayload) {
-	    try {
-	        Roles role = new Roles();
-	        role.setrolename(rolePayload.getRolename());
-	        role.setroledescription(rolePayload.getRoledescription());
-	        role.setStatus("Active");
-	        LocalDateTime now = LocalDateTime.now();
-	        role.setCreated_at(now);
+public class RoleService {
 
-	        Roles savedRole = roleRepository.save(role);
+    @Autowired
+    private RoleRepository roleRepository;
 
-	        Map<String, RolePayload.PermissionFlags> permissionsMap = new HashMap<>();
+    @Autowired
+    private PermissionsRepository permissionsRepository;
 
-	        for (Map.Entry<String, RolePayload.PermissionFlags> entry : rolePayload.getPermissions().entrySet()) {
-	            String functionality = entry.getKey();
-	            RolePayload.PermissionFlags flags = entry.getValue();
+    @Autowired
+    private AdvCriteriaRepository advCriteriaRepository;
 
-	            Permissions permission = new Permissions();
-	            permission.setRoleid(savedRole.getRoleid());
-	            permission.setFunctionality(functionality);
-	            permission.setIsread(flags.isRead());
-	            permission.setIscreate(flags.isCreate());
-	            permission.setIsedit(flags.isEdit());
-	            permission.setIsdelete(flags.isDelete());
-	            permission.setCreated_at(now);
+    // CREATE ROLE
+    public String createRole(RoleDTO rolePayload) {
+        try {
+            Roles role = new Roles();
+            role.setrolename(rolePayload.getRoleName());
+            role.setroledescription(rolePayload.getRoleDescription());
+            role.setStatus("Active");
+            role.setCreated_at(LocalDateTime.now());
+            Roles savedRole = roleRepository.save(role);
 
-	            permissionRepository.save(permission);
+            for (PermissionDTO permissionDTO : rolePayload.getPermissions()) {
+                String functionality = permissionDTO.getFunctionality();
 
-	            permissionsMap.put(functionality, flags);
-	        }
+                Permissions permission = new Permissions();
+                permission.setRoleid(savedRole.getRoleid());
+                permission.setFunctionality(functionality);
+                permission.setIsread(permissionDTO.isIsread());
+                permission.setIscreate(permissionDTO.isIscreate());
+                permission.setIsedit(permissionDTO.isIsedit());
+                permission.setIsdelete(permissionDTO.isIsdelete());
+                permission.setCreated_at(LocalDateTime.now());
+                Permissions savedPermission = permissionsRepository.save(permission);
 
-	        RolePayload responsePayload = new RolePayload(
-	            savedRole.getRoleid(),
-	            savedRole.getrolename(),
-	            savedRole.getroledescription(),
-	            savedRole.getStatus(),
-	            savedRole.getCreated_at(),
-	            savedRole.getUpdated_at(),
-	            permissionsMap
-	        );
+                List<AdvCriteria> criteriaList = permissionDTO.getCriteria().stream().map(criteriaDTO -> {
+                    AdvCriteria criteria = new AdvCriteria();
+                    criteria.setRoleid(savedRole.getRoleid());
+                    criteria.setPermissionid(savedPermission.getId());
+                    criteria.setFunction(savedPermission.getFunctionality());
+                    criteria.setCriterianame(criteriaDTO.getCriterianame());
+                    criteria.setOperation(criteriaDTO.getOperation());
+                    criteria.setCriteriavalue(criteriaDTO.getCriteriavalue());
+                    return criteria;
+                }).collect(Collectors.toList());
 
-	        return "Success";
+                advCriteriaRepository.saveAll(criteriaList);
+            }
+            return "Role created successfully.";
+        } catch (DataIntegrityViolationException e) {
+            return "Role with the same name already exists.";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Failed to create role.";
+        }
+    }
 
-	    } catch (DataIntegrityViolationException e) {
-	        if (e.getCause() instanceof org.hibernate.exception.ConstraintViolationException) {
-	            System.err.println("Role already exists with the same name.");
-	            System.err.println("Role with name '" + rolePayload.getRolename() + "' already exists.");
-	            return ("Role with name '" + rolePayload.getRolename() + "' already exists.");
-	        }
-	        return e.getLocalizedMessage();
-	    } 
-	}
 
-	 public List<RolePayload> getAllRolePayloads() {
-	        List<Permissions> allPermissions = permissionRepository.findAll();
-	        Map<String, Map<String, RolePayload.PermissionFlags>> permissionsMap = allPermissions.stream()
-	            .collect(Collectors.groupingBy(
-	                Permissions::getRoleid,
-	                Collectors.toMap(
-	                    Permissions::getFunctionality,
-	                    perm -> new RolePayload.PermissionFlags(
-	                        perm.isIsread(),
-	                        perm.isIsedit(),
-	                        perm.isIscreate(),
-	                        perm.isIsdelete()
-	                    )
-	                )
-	            ));
+    // GET ALL ROLES
+    public List<RoleDTO> getAllRoles() {
+        List<Roles> roles = roleRepository.findAll();
+        List<Permissions> permissions = permissionsRepository.findAll();
+        List<AdvCriteria> criteria = advCriteriaRepository.findAll();
 
-	        return roleRepository.findAll().stream()
-	            .map(role -> new RolePayload(
-	                role.getRoleid(),
-	                role.getrolename(),
-	                role.getroledescription(),
-	                role.getStatus(),
-	                role.getCreated_at(),
-	                role.getUpdated_at(),
-	                permissionsMap.getOrDefault(role.getRoleid(), Collections.emptyMap())
-	            ))
-	            .collect(Collectors.toList());
-	    }
+        Map<String, List<Permissions>> permissionsByRole = permissions.stream()
+                .collect(Collectors.groupingBy(Permissions::getRoleid));
 
-	    public Optional<RolePayload> getRolePayloadById(String roleId) {
-	        return roleRepository.findById(roleId)
-	            .map(role -> {
-	                Map<String, RolePayload.PermissionFlags> permissions = permissionRepository.findByRoleid(roleId).stream()
-	                    .collect(Collectors.toMap(
-	                        Permissions::getFunctionality,
-	                        perm -> new RolePayload.PermissionFlags(
-	                            perm.isIsread(),
-	                            perm.isIsedit(),
-	                            perm.isIscreate(),
-	                            perm.isIsdelete()
-	                        )
-	                    ));
+        Map<String, List<AdvCriteria>> criteriaByPermission = criteria.stream()
+                .collect(Collectors.groupingBy(AdvCriteria::getPermissionid));
 
-	                return new RolePayload(role.getRoleid(), role.getrolename(), role.getroledescription(),role.getStatus(),role.getCreated_at(),role.getUpdated_at(), permissions);
-	            });
-	    }
-	
-	
-	@Transactional
-    public Optional<RolePayload> updateRoleWithPermissions(String roleId, RolePayload rolePayload) {
-        // Fetch the existing role by ID
+        return roles.stream().map(role -> {
+            List<PermissionDTO> permissionDTOs = permissionsByRole.getOrDefault(role.getRoleid(), Collections.emptyList())
+                    .stream()
+                    .map(permission -> {
+                        List<AdvCriteriaDTO> criteriaDTOs = criteriaByPermission
+                                .getOrDefault(permission.getId(), Collections.emptyList())
+                                .stream()
+                                .map(criterion -> new AdvCriteriaDTO(
+                                        criterion.getAdvcid(),
+                                        criterion.getPermissionid(),
+                                        criterion.getRoleid(),
+                                        criterion.getCriterianame(),
+                                        criterion.getOperation(),
+                                        criterion.getCriteriavalue(),
+                                        criterion.getFunction()
+                                ))
+                                .collect(Collectors.toList());
+
+                        return new PermissionDTO(
+                                permission.getId(),
+                                permission.getRoleid(),
+                                permission.getFunctionality(),
+                                permission.isIsread(),
+                                permission.isIsedit(),
+                                permission.isIscreate(),
+                                permission.isIsdelete(),
+                                permission.getCreated_at(),
+                                criteriaDTOs
+                        );
+                    })
+                    .collect(Collectors.toList());
+
+            return new RoleDTO(
+                    role.getRoleid(),
+                    role.getrolename(),
+                    role.getroledescription(),
+                    role.getStatus(),
+                    role.getCreated_at(),
+                    permissionDTOs
+            );
+        }).collect(Collectors.toList());
+    }
+    
+    
+    // GET ROLE BY ID
+    public RoleDTO getRoleById(String roleId) {
+        Optional<Roles> roleOpt = roleRepository.findById(roleId);
+        if (roleOpt.isEmpty()) {
+            throw new RuntimeException("Role not found.");
+        }
+
+        Roles role = roleOpt.get();
+
+        List<Permissions> permissions = permissionsRepository.findByRoleid(roleId);
+
+        List<AdvCriteria> allCriteria = advCriteriaRepository.findByRoleid(roleId);
+
+        Map<String, List<AdvCriteria>> criteriaByPermission = allCriteria.stream()
+                .collect(Collectors.groupingBy(AdvCriteria::getPermissionid));
+
+        List<PermissionDTO> permissionDTOs = permissions.stream()
+                .map(permission -> {
+                    List<AdvCriteriaDTO> criteriaDTOs = criteriaByPermission
+                            .getOrDefault(permission.getId(), Collections.emptyList())
+                            .stream()
+                            .map(criterion -> new AdvCriteriaDTO(
+                                    criterion.getAdvcid(),
+                                    criterion.getPermissionid(),
+                                    criterion.getRoleid(),
+                                    criterion.getCriterianame(),
+                                    criterion.getOperation(),
+                                    criterion.getCriteriavalue(),
+                                    criterion.getFunction()
+                            ))
+                            .collect(Collectors.toList());
+
+                    return new PermissionDTO(
+                            permission.getId(),
+                            permission.getRoleid(),
+                            permission.getFunctionality(),
+                            permission.isIsread(),
+                            permission.isIsedit(),
+                            permission.isIscreate(),
+                            permission.isIsdelete(),
+                            permission.getCreated_at(),
+                            criteriaDTOs
+                    );
+                })
+                .collect(Collectors.toList());
+
+        return new RoleDTO(
+                role.getRoleid(),
+                role.getrolename(),
+                role.getroledescription(),
+                role.getStatus(),
+                role.getCreated_at(),
+                permissionDTOs
+        );
+    }
+
+
+    //UPDATE ROLE
+    @Transactional
+    public String updateRole(String roleId, RoleDTO rolePayload) {
         Optional<Roles> existingRoleOpt = roleRepository.findById(roleId);
-
         if (existingRoleOpt.isEmpty()) {
-            return Optional.empty();
+            return "Role not found.";
         }
 
         Roles existingRole = existingRoleOpt.get();
-        existingRole.setrolename(rolePayload.getRolename());
-        existingRole.setroledescription(rolePayload.getRoledescription());
-        existingRole.setStatus(rolePayload.getStatus());
-        existingRole.setUpdated_at(LocalDateTime.now());
 
+        existingRole.setrolename(rolePayload.getRoleName());
+        existingRole.setroledescription(rolePayload.getRoleDescription());
+        existingRole.setUpdated_at(LocalDateTime.now());
         roleRepository.save(existingRole);
 
-        Map<String, RolePayload.PermissionFlags> newPermissionsMap = rolePayload.getPermissions();
-        List<Permissions> existingPermissions = permissionRepository.findByRoleid(roleId);
-
-        // Map existing permissions by functionality for easy lookup
+        List<Permissions> existingPermissions = permissionsRepository.findByRoleid(roleId);
         Map<String, Permissions> existingPermissionsMap = existingPermissions.stream()
-            .collect(Collectors.toMap(Permissions::getFunctionality, perm -> perm));
+                .collect(Collectors.toMap(Permissions::getFunctionality, perm -> perm));
 
-        List<Permissions> updatedPermissions = new ArrayList<>();
+        for (PermissionDTO permissionDTO : rolePayload.getPermissions()) {
+            String functionality = permissionDTO.getFunctionality();
 
-        for (Map.Entry<String, RolePayload.PermissionFlags> entry : newPermissionsMap.entrySet()) {
-            String functionality = entry.getKey();
-            RolePayload.PermissionFlags flags = entry.getValue();
-
-            Permissions permission = existingPermissionsMap.getOrDefault(functionality, new Permissions());
-            permission.setRoleid(roleId);
-            permission.setFunctionality(functionality);
-            permission.setIsread(flags.isRead());
-            permission.setIscreate(flags.isCreate());
-            permission.setIsedit(flags.isEdit());
-            permission.setIsdelete(flags.isDelete());
-
-            updatedPermissions.add(permission);
-        }
-
-        // Save all updated permissions
-        permissionRepository.saveAll(updatedPermissions);
-
-        List<Permissions> permissionsToDelete = existingPermissions.stream()
-            .filter(perm -> !newPermissionsMap.containsKey(perm.getFunctionality()))
-            .collect(Collectors.toList());
-        permissionRepository.deleteAll(permissionsToDelete);
-
-        return Optional.of(new RolePayload(
-            existingRole.getRoleid(),
-            existingRole.getrolename(),
-            existingRole.getroledescription(),
-            existingRole.getStatus(),
-            existingRole.getCreated_at(),
-            existingRole.getUpdated_at(),
-            newPermissionsMap
-        ));
-    }
-	
-	@Transactional
-    public boolean deleteRole(String roleId) {
-        try {
-            // Check if the role exists
-            Optional<Roles> existingRole = roleRepository.findById(roleId);
-            if (existingRole.isPresent()) {
-                Roles role = existingRole.get();
-
-                // Check if the role status is "Inactive"
-                if ("Inactive".equals(role.getStatus())) {
-                    // Delete all permissions associated with the role
-                    permissionRepository.deleteByRoleid(roleId);
-
-                    // Delete the role itself
-                    roleRepository.deleteById(roleId);
-
-                    return true; // Successful deletion
-                } else {
-                    System.out.println("Role status is not Inactive.");
-                    return false; // Role status is not Inactive, do not delete
-                }
-            } else {
-                System.out.println("Role not found with ID: " + roleId);
-                return false; // Role not found
+            Permissions permission = existingPermissionsMap.get(functionality);
+            if (permission == null) {
+                permission = new Permissions();
+                permission.setRoleid(roleId);
+                permission.setFunctionality(functionality);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false; // Exception occurred during deletion
+
+            permission.setIsread(permissionDTO.isIsread());
+            permission.setIscreate(permissionDTO.isIscreate());
+            permission.setIsedit(permissionDTO.isIsedit());
+            permission.setIsdelete(permissionDTO.isIsdelete());
+            Permissions savedPermission = permissionsRepository.save(permission);
+
+            advCriteriaRepository.deleteByPermissionid(savedPermission.getId());
+
+            List<AdvCriteria> criteriaList = permissionDTO.getCriteria().stream()
+                    .map(criteriaDTO -> {
+                        AdvCriteria criteria = new AdvCriteria();
+                        criteria.setRoleid(roleId);
+                        criteria.setPermissionid(savedPermission.getId());
+                        criteria.setFunction(savedPermission.getFunctionality());
+                        criteria.setCriterianame(criteriaDTO.getCriterianame());
+                        criteria.setOperation(criteriaDTO.getOperation());
+                        criteria.setCriteriavalue(criteriaDTO.getCriteriavalue());
+                        return criteria;
+                    })
+                    .collect(Collectors.toList());
+
+            advCriteriaRepository.saveAll(criteriaList);
         }
+
+        Set<String> functionalitiesInPayload = rolePayload.getPermissions().stream()
+                .map(PermissionDTO::getFunctionality)
+                .collect(Collectors.toSet());
+
+        existingPermissions.stream()
+                .filter(permission -> !functionalitiesInPayload.contains(permission.getFunctionality()))
+                .forEach(permission -> {
+                    advCriteriaRepository.deleteByPermissionid(permission.getId());
+                    permissionsRepository.delete(permission);
+                });
+
+        return "Role updated successfully.";
     }
+
+
+    // DELETE ROLE
+    @Transactional
+    public String deleteRole(String roleId) {
+        Optional<Roles> roleOpt = roleRepository.findById(roleId);
+        if (roleOpt.isEmpty()) {
+            return "Role not found.";
+        }
+
+        Roles role = roleOpt.get();
+
+        List<Permissions> permissions = permissionsRepository.findByRoleid(roleId);
+
+        for (Permissions permission : permissions) {
+            advCriteriaRepository.deleteByPermissionid(permission.getId());
+        }
+
+        permissionsRepository.deleteByRoleid(roleId);
+
+        roleRepository.delete(role);
+
+        return "Role deleted successfully.";
+    }
+
 }
