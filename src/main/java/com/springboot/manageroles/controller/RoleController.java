@@ -62,6 +62,23 @@ public class RoleController {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while fetching the role.");
 	    }
 	}
+	
+	@GetMapping("/getRoleByName")
+	public ResponseEntity<?> getRolebyName(@RequestParam String rolename) {
+	    try {
+	        RoleDTO rolePayload = roleService.getRoleByName(rolename);
+
+	        if (rolePayload == null) {
+	            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+	        }
+
+	        return ResponseEntity.status(HttpStatus.OK).body(rolePayload);
+	    } catch (RuntimeException e) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Role not found.");
+	    } catch (Exception e) {
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while fetching the role.");
+	    }
+	}
 
     
     @PutMapping("/update")
@@ -73,6 +90,37 @@ public class RoleController {
         if(updatedRolePayload != null)
         {
         	return  ResponseEntity.status(HttpStatus.OK).body(updatedRolePayload);
+        }
+        else {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role updation failure");
+        }
+    }
+    
+    @PutMapping("/updateRoleUsers")
+    public ResponseEntity<?> updateRoleUsers(
+        @RequestParam String rolename
+    ) {
+        boolean response = roleService.updateRoleUser(rolename);
+
+        if(response)
+        {
+        	return  ResponseEntity.status(HttpStatus.OK).body("Success");
+        }
+        else {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role updation failure");
+        }
+    }
+    
+    @PutMapping("/updateRoleUsersRemove")
+    public ResponseEntity<?> updateRoleUsersRemoe(
+        @RequestParam String rolename
+    ) {
+
+        boolean response = roleService.updateRoleUserRemove(rolename);
+
+        if(response)
+        {
+        	return  ResponseEntity.status(HttpStatus.OK).body("Success");
         }
         else {
         	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role updation failure");

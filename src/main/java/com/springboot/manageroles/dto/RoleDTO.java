@@ -12,16 +12,19 @@ public class RoleDTO {
     private String status;
     private LocalDateTime created_at;
     private List<PermissionDTO> permissions;
+    private int usersAssigned;
 
     public RoleDTO() {}
 
-    public RoleDTO(String roleId, String roleName, String roleDescription, String status,LocalDateTime created_at, List<PermissionDTO> permissions) {
+    public RoleDTO(String roleId, String roleName, String roleDescription, String status,
+    		LocalDateTime created_at, int usersAssigned, List<PermissionDTO> permissions) {
         this.roleId = roleId;
         this.roleName = roleName;
         this.roleDescription = roleDescription;
         this.status = status;
         this.created_at = created_at;
         this.permissions = permissions;
+        this.usersAssigned = usersAssigned;
     }
 
     public LocalDateTime getCreated_at() {
@@ -67,6 +70,15 @@ public class RoleDTO {
     public void setPermissions(List<PermissionDTO> permissions) {
         this.permissions = permissions;
     }
+    
+
+	public int getUsersAssigned() {
+		return usersAssigned;
+	}
+
+	public void setUsersAssigned(int usersAssigned) {
+		this.usersAssigned = usersAssigned;
+	}
 
 	@Override
 	public String toString() {

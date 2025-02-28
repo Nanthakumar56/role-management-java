@@ -20,13 +20,14 @@ public class Roles {
 	private String status;
 	private LocalDateTime created_at;
 	private LocalDateTime updated_at;
+	private int usersAssigned;
 	
 	public Roles() {
 		super();
 	}
 	
 	public Roles(String roleid, String rolename, String roledescription, String status, LocalDateTime created_at,
-			LocalDateTime updated_at) {
+			LocalDateTime updated_at, int usersAssigned) {
 		super();
 		this.roleid = roleid;
 		this.rolename = rolename;
@@ -34,6 +35,7 @@ public class Roles {
 		this.status = status;
 		this.created_at = created_at;
 		this.updated_at = updated_at;
+		this.usersAssigned = usersAssigned;
 	}
 
 	public String getRoleid() {
@@ -71,6 +73,14 @@ public class Roles {
 	}
 	public void setUpdated_at(LocalDateTime updated_at) {
 		this.updated_at = updated_at;
+	}
+
+	public int getUsersAssigned() {
+		return usersAssigned;
+	}
+
+	public void setUsersAssigned(int usersAssigned) {
+		this.usersAssigned = usersAssigned;
 	}
 	
 }
